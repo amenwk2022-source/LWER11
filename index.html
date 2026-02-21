@@ -5362,7 +5362,7 @@ function showToast(msg) {
 }
 
 <!-- =================== LOGIN SCREEN =================== -->
-<div id="loginScreen" style="display:none;position:fixed;inset:0;background:var(--dark);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">
+<div id="loginScreen" style="display:none;position:fixed;inset:0;background:var(--dark);z-index:9999;align-items:center;justify-content:center;padding:20px;">
   <div style="width:100%;max-width:440px;">
     <!-- Logo -->
     <div style="text-align:center;margin-bottom:40px;">
@@ -5921,27 +5921,48 @@ window.addEventListener('DOMContentLoaded', () => {
   const url = localStorage.getItem('sb_url');
   const key = localStorage.getItem('sb_key');
 
-  // إصلاح navigateTo
-  const _orig = navigateTo;
-  window.navigateTo = function(pageId, navEl) {
-    _orig(pageId, navEl);
-    if (!supabase) return;
-    if (pageId === 'cases') loadCases();
-    if (pageId === 'clients') loadClients();
-  };
-
-  if (url && key && initSupabase(url, key)) {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        currentUser = session.user;
-        loadCurrentStaff().then(() => {
-          showToast('👋 مرحباً بعودتك!');
-          setupRealtime();
-        });
-      } else {
-        showLoginScreen();
-      }
-    });
+  if (url && key) {
+    // عندما يكون Supabase مضبوط — تحقق من الجلسة
+    const ok = initSupabase(url, key);
+    if (ok) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          currentUser = session.user;
+          loadCurrentStaff().then(() => {
+            enterApp();
+            setupRealtime();
+          });
+        } else {
+          showLoginScreen();
+        }
+      });
+    }
   }
-  // بدون Supabase — يعمل مباشرة بدون لوجين
+  // ✅ بدون Supabase — التطبيق يعمل مباشرة (وضع تجريبي)
 });
+
+function saveSupabaseFromSettings() {
+  const url = document.getElementById('settings-sb-url')?.value.trim();
+  const key = document.getElementById('settings-sb-key')?.value.trim();
+  if (url && key) {
+    localStorage.setItem('sb_url', url);
+    localStorage.setItem('sb_key', key);
+    showToast('🔧 تم تحديث إعدادات Supabase — سيتم إعادة التحميل...');
+    setTimeout(() => location.reload(), 1500);
+  }
+}
+
+if (window.supabase && localStorage.getItem('sb_url')) {
+  const sbCheck = window.supabase.createClient(
+    localStorage.getItem('sb_url'),
+    localStorage.getItem('sb_key')
+  );
+  sbCheck.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT') showLoginScreen();
+    if (event === 'TOKEN_REFRESHED') console.log('✅ Token refreshed');
+  });
+}
+</script>
+
+</body>
+</html>
